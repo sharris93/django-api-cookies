@@ -18,11 +18,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy project files
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
 # Expose port Render expects
 EXPOSE 8000
 
 # Run Gunicorn
-CMD ["gunicorn", "purchaseiqbackend.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && gunicorn purchaseiqbackend.wsgi:application --bind 0.0.0.0:8000"]
