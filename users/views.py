@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import UserUpdateSerializer
 from django.contrib.auth import get_user_model
@@ -37,16 +38,51 @@ class SigninView(TokenObtainPairView):
 
 class RefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
-        request.data["refresh"] = request.COOKIES.get("refresh_token")
-        return super().post(request, *args, **kwargs)
+        # Get refresh token from cookies
+        refresh_token = request.COOKIES.get("refresh_token", None)
+        if not refresh_token:
+            return Response('Missing refresh token', 401)
+        request.data["refresh"] = refresh_token
+
+        # Call the parent post method to get the token response
+        response = super().post(request, *args, **kwargs)
+
+        # If successful, set the access_token cookie
+        response.data.pop('refresh')
+        access = response.data.pop('access', None)
+        if response.status_code == 200 and access:
+            response.set_cookie(
+                "access_token",
+                str(access),
+                httponly=True,
+                secure=True,
+                samesite="None",
+                path="/",
+                max_age=7 * 24 * 60 * 60,  # 7 days
+            )
+
+        return response
 
 class SignoutView(APIView):
-    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        response = Response({"detail": "logged out"})
-        response.delete_cookie("refresh_token")
-        response.delete_cookie("access_token") # ADDED THIS LINE TO REMOVE ACCESS TOKEN ON SIGN OUT
+        response = Response(
+            {"detail": "Logged out successfully"},
+            status=status.HTTP_200_OK,
+        )
+
+        # IMPORTANT: attributes must match creation
+        response.delete_cookie(
+            key="access_token",
+            path="/",
+            samesite='None'
+        )
+        response.delete_cookie(
+            key="refresh_token",
+            path="/",
+            samesite='None'
+        )
+
         return response
 
 class MeView(APIView):

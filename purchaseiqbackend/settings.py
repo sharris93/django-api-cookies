@@ -27,9 +27,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', False)
 
-ALLOWED_HOSTS = []
+if DEBUG:
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1'] # local frontend urls without protocols
+
+    CORS_ALLOWED_ORIGINS = [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ]
+
+    CSRF_TRUSTED_ORIGINS = [
+        "http://127.0.0.1:8000", # Local backend url
+        "http://localhost:8000" # localhost for good measure
+    ]
+
+else:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    ALLOWED_HOSTS = [env('DEPLOYED_BACKEND_URL').replace('https://', '')] # removes protocol (https://)
+
+    CORS_ALLOWED_ORIGINS = [
+        env('DEPLOYED_FRONTEND_URL'), # Deployed frontend url only
+    ]
+
+    CSRF_TRUSTED_ORIGINS = [
+        env('DEPLOYED_BACKEND_URL'), # Deployed backend url only
+    ]
+
+# CORS in both environments
+CSRF_COOKIE_SAMESITE = "Strict"
+SESSION_COOKIE_SAMESITE = "Strict"
+CORS_ALLOW_CREDENTIALS = True
+
 
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
@@ -55,14 +89,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'purchaseiqbackend.urls'
@@ -88,16 +121,31 @@ WSGI_APPLICATION = 'purchaseiqbackend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('PGDATABASE'),
-        'USER': env('PGUSER'),
-        'PASSWORD': env('PGPASSWORD'),
-        'HOST': env('PGHOST')
+if DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('PGDATABASE'),
+            'USER': env('PGUSER'),
+            'PASSWORD': env('PGPASSWORD'),
+            'HOST': env('PGHOST')
+        }
     }
-}
-
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("PGDATABASE"),
+            "USER": env("PGUSER"),
+            "PASSWORD": env("PGPASSWORD"),
+            "HOST": env("PGHOST"),
+            "PORT": 5432,
+            "OPTIONS": {
+                "sslmode": "require",
+            },
+            "CONN_MAX_AGE": 600,
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -134,6 +182,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # DRF
 
@@ -160,27 +209,7 @@ SIMPLE_JWT = {
     "ALGORITHM": "HS256",
 }
 
-CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = "Strict"
 
-SESSION_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = "Strict"
-
-CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-]
-CORS_ALLOW_CREDENTIALS = True
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-]
-
-# Dev only
-
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
 
 
 # AWS S3 for image storage
